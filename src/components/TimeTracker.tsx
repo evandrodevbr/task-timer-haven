@@ -165,7 +165,7 @@ const TimeTracker = () => {
   const updateTaskTime = async (taskId: string, timeString: string) => {
     const newTime = parseTime(timeString);
     if (currentUser) {
-      await db.updateTaskTime(parseInt(taskId), newTime);
+      await db.updateTaskTime(currentUser.id, taskId, newTime);
     }
     setTasks(currentTasks =>
       currentTasks.map(task => {
