@@ -14,6 +14,7 @@ interface Task {
 }
 
 interface UserData {
+  name: string;
   tasks: Task[];
 }
 
@@ -83,7 +84,7 @@ export const createTask = (userId: number, name: string): string => {
   const filePath = getUserFilePath(userId);
   const userData: UserData = fs.existsSync(filePath) 
     ? JSON.parse(fs.readFileSync(filePath, 'utf-8'))
-    : { tasks: [] };
+    : { name: '', tasks: [] };
   
   const taskId = Date.now().toString();
   const newTask: Task = {

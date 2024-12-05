@@ -14,6 +14,7 @@ interface Task {
   timeElapsed: number;
   isRunning: boolean;
   isEditing: boolean;
+  startTime?: number | null;
 }
 
 const TimeTracker = () => {
@@ -123,13 +124,12 @@ const TimeTracker = () => {
   };
 
   const toggleTimer = async (taskId: string) => {
+    if (!currentUser) return;
     setTasks(currentTasks =>
       currentTasks.map(task => {
         if (task.id === taskId) {
           const newIsRunning = !task.isRunning;
-          if (currentUser) {
-            db.updateTaskRunningState(parseInt(taskId), newIsRunning);
-          }
+          db.updateTaskRunningState(currentUser.id, taskId, newIsRunning);
           if (newIsRunning) {
             return { ...task, isRunning: true, startTime: Date.now() };
           } else {
@@ -142,9 +142,8 @@ const TimeTracker = () => {
   };
 
   const deleteTask = async (taskId: string) => {
-    if (currentUser) {
-      await db.deleteTask(parseInt(taskId));
-    }
+    if (!currentUser) return;
+    await db.deleteTask(currentUser.id, taskId);
     setTasks(currentTasks => currentTasks.filter(task => task.id !== taskId));
     toast({
       title: "Tarefa excluída",
