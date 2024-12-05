@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { PlayCircle, PauseCircle, StopCircle, Plus, Trash2, Pencil } from "lucide-react";
+import { Plus } from "lucide-react";
+import TaskItem from './TaskItem';
+import UserLogin from './UserLogin';
+import * as db from '../services/database';
 
 interface Task {
   id: string;
@@ -18,7 +20,21 @@ interface Task {
 const TimeTracker = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskName, setNewTaskName] = useState("");
+  const [currentUser, setCurrentUser] = useState<{ id: number; name: string } | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const initDb = async () => {
+      await db.initDatabase();
+    };
+    initDb();
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      loadTasks();
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -26,6 +42,9 @@ const TimeTracker = () => {
         currentTasks.map(task => {
           if (task.isRunning && task.startTime) {
             const timeElapsed = task.timeElapsed + (Date.now() - task.startTime);
+            if (currentUser) {
+              db.updateTaskTime(parseInt(task.id), timeElapsed);
+            }
             return { ...task, timeElapsed, startTime: Date.now() };
           }
           return task;
@@ -34,7 +53,33 @@ const TimeTracker = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [currentUser]);
+
+  const loadTasks = async () => {
+    if (!currentUser) return;
+    const dbTasks = await db.getTasks(currentUser.id);
+    setTasks(dbTasks.map(task => ({
+      id: task.id.toString(),
+      name: task.name,
+      timeElapsed: task.timeElapsed,
+      isRunning: Boolean(task.isRunning),
+      startTime: null,
+      isEditing: false
+    })));
+  };
+
+  const handleLogin = async (username: string) => {
+    let user = await db.getUserByName(username);
+    if (!user) {
+      const userId = await db.createUser(username);
+      user = { id: userId, name: username };
+    }
+    setCurrentUser(user);
+    toast({
+      title: "Bem-vindo",
+      description: `Olá, ${username}!`,
+    });
+  };
 
   const formatTime = (ms: number) => {
     const seconds = Math.floor((ms / 1000) % 60);
@@ -51,7 +96,8 @@ const TimeTracker = () => {
     return ((hours * 60 * 60) + (minutes * 60) + seconds) * 1000;
   };
 
-  const addTask = () => {
+  const addTask = async () => {
+    if (!currentUser) return;
     if (!newTaskName.trim()) {
       toast({
         title: "Erro",
@@ -61,8 +107,9 @@ const TimeTracker = () => {
       return;
     }
 
+    const taskId = await db.createTask(currentUser.id, newTaskName);
     const newTask: Task = {
-      id: Date.now().toString(),
+      id: taskId.toString(),
       name: newTaskName,
       timeElapsed: 0,
       isRunning: false,
@@ -79,14 +126,18 @@ const TimeTracker = () => {
     });
   };
 
-  const toggleTimer = (taskId: string) => {
+  const toggleTimer = async (taskId: string) => {
     setTasks(currentTasks =>
       currentTasks.map(task => {
         if (task.id === taskId) {
-          if (task.isRunning) {
-            return { ...task, isRunning: false, startTime: null };
-          } else {
+          const newIsRunning = !task.isRunning;
+          if (currentUser) {
+            db.updateTaskRunningState(parseInt(taskId), newIsRunning);
+          }
+          if (newIsRunning) {
             return { ...task, isRunning: true, startTime: Date.now() };
+          } else {
+            return { ...task, isRunning: false, startTime: null };
           }
         }
         return task;
@@ -94,18 +145,10 @@ const TimeTracker = () => {
     );
   };
 
-  const stopTask = (taskId: string) => {
-    setTasks(currentTasks =>
-      currentTasks.map(task => {
-        if (task.id === taskId) {
-          return { ...task, isRunning: false, startTime: null };
-        }
-        return task;
-      })
-    );
-  };
-
-  const deleteTask = (taskId: string) => {
+  const deleteTask = async (taskId: string) => {
+    if (currentUser) {
+      await db.deleteTask(parseInt(taskId));
+    }
     setTasks(currentTasks => currentTasks.filter(task => task.id !== taskId));
     toast({
       title: "Tarefa excluída",
@@ -124,8 +167,11 @@ const TimeTracker = () => {
     );
   };
 
-  const updateTaskTime = (taskId: string, timeString: string) => {
+  const updateTaskTime = async (taskId: string, timeString: string) => {
     const newTime = parseTime(timeString);
+    if (currentUser) {
+      await db.updateTaskTime(parseInt(taskId), newTime);
+    }
     setTasks(currentTasks =>
       currentTasks.map(task => {
         if (task.id === taskId) {
@@ -135,6 +181,10 @@ const TimeTracker = () => {
       })
     );
   };
+
+  if (!currentUser) {
+    return <UserLogin onLogin={handleLogin} />;
+  }
 
   return (
     <div className="container mx-auto p-6 max-w-3xl animate-slide-up">
@@ -157,62 +207,15 @@ const TimeTracker = () => {
 
         <div className="space-y-4">
           {tasks.map((task) => (
-            <Card key={task.id} className="p-4 glass-card">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <h3 className="font-medium">{task.name}</h3>
-                </div>
-                <div className="flex items-center space-x-4">
-                  {task.isEditing ? (
-                    <Input
-                      type="text"
-                      defaultValue={formatTime(task.timeElapsed)}
-                      className="w-32 text-center font-mono"
-                      onBlur={(e) => updateTaskTime(task.id, e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          updateTaskTime(task.id, e.currentTarget.value);
-                        }
-                      }}
-                    />
-                  ) : (
-                    <span 
-                      className="timer-text text-lg font-mono cursor-pointer"
-                      onClick={() => toggleEditMode(task.id)}
-                    >
-                      {formatTime(task.timeElapsed)}
-                    </span>
-                  )}
-                  <div className="flex space-x-2">
-                    <Button
-                      variant={task.isRunning ? "destructive" : "default"}
-                      size="icon"
-                      onClick={() => toggleTimer(task.id)}
-                    >
-                      {task.isRunning ? (
-                        <PauseCircle className="h-5 w-5" />
-                      ) : (
-                        <PlayCircle className="h-5 w-5" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      onClick={() => stopTask(task.id)}
-                    >
-                      <StopCircle className="h-5 w-5" />
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      onClick={() => deleteTask(task.id)}
-                    >
-                      <Trash2 className="h-5 w-5" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </Card>
+            <TaskItem
+              key={task.id}
+              task={task}
+              formatTime={formatTime}
+              onToggleTimer={toggleTimer}
+              onDeleteTask={deleteTask}
+              onToggleEdit={toggleEditMode}
+              onUpdateTime={updateTaskTime}
+            />
           ))}
         </div>
       </div>
