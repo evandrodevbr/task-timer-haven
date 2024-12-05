@@ -1,86 +1,129 @@
-import SQLite from '@sqlite.org/sqlite-wasm';
+import fs from 'fs';
+import path from 'path';
 
-let db: any = null;
+interface User {
+  id: number;
+  name: string;
+}
+
+interface Task {
+  id: string;
+  name: string;
+  timeElapsed: number;
+  isRunning: boolean;
+}
+
+interface UserData {
+  tasks: Task[];
+}
+
+const DATABASE_DIR = path.join(process.cwd(), 'database');
+
+// Ensure database directory exists
+if (!fs.existsSync(DATABASE_DIR)) {
+  fs.mkdirSync(DATABASE_DIR, { recursive: true });
+}
+
+const getUserFilePath = (userId: number) => {
+  return path.join(DATABASE_DIR, `user_${userId}.json`);
+};
+
+let lastUserId = 0;
+
+// Load the last user ID from existing files
+const userFiles = fs.readdirSync(DATABASE_DIR);
+userFiles.forEach(file => {
+  if (file.startsWith('user_') && file.endsWith('.json')) {
+    const userId = parseInt(file.replace('user_', '').replace('.json', ''));
+    if (userId > lastUserId) {
+      lastUserId = userId;
+    }
+  }
+});
 
 export const initDatabase = async () => {
-  try {
-    const sqlite3 = await SQLite({
-      print: console.log,
-      printErr: console.error,
-    });
-    
-    db = new sqlite3.oo1.DB();
-    
-    // Create tables
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL UNIQUE
-      );
-      
-      CREATE TABLE IF NOT EXISTS tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        name TEXT NOT NULL,
-        timeElapsed INTEGER DEFAULT 0,
-        isRunning BOOLEAN DEFAULT 0,
-        FOREIGN KEY(user_id) REFERENCES users(id)
-      );
-    `);
-    
-    console.log('Database initialized successfully');
-    return db;
-  } catch (error) {
-    console.error('Failed to initialize database:', error);
-    throw error;
+  // No initialization needed for JSON files
+  return Promise.resolve();
+};
+
+export const getUserByName = (name: string): User | null => {
+  const userFiles = fs.readdirSync(DATABASE_DIR);
+  for (const file of userFiles) {
+    if (file.endsWith('.json')) {
+      const userData = JSON.parse(fs.readFileSync(path.join(DATABASE_DIR, file), 'utf-8'));
+      if (userData.name === name) {
+        return { id: parseInt(file.split('_')[1].replace('.json', '')), name };
+      }
+    }
   }
+  return null;
 };
 
-export const getDb = () => {
-  if (!db) {
-    throw new Error('Database not initialized. Call initDatabase() first.');
+export const createUser = (name: string): number => {
+  lastUserId++;
+  const userId = lastUserId;
+  const userData = {
+    name,
+    tasks: []
+  };
+  fs.writeFileSync(getUserFilePath(userId), JSON.stringify(userData, null, 2));
+  return userId;
+};
+
+export const getTasks = (userId: number): Task[] => {
+  const filePath = getUserFilePath(userId);
+  if (!fs.existsSync(filePath)) {
+    return [];
   }
-  return db;
+  const userData: UserData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  return userData.tasks || [];
 };
 
-export const createUser = (name: string) => {
-  const db = getDb();
-  const stmt = db.prepare('INSERT INTO users (name) VALUES (?)');
-  stmt.run([name]);
-  return db.selectValue('SELECT last_insert_rowid()');
+export const createTask = (userId: number, name: string): string => {
+  const filePath = getUserFilePath(userId);
+  const userData: UserData = fs.existsSync(filePath) 
+    ? JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+    : { tasks: [] };
+  
+  const taskId = Date.now().toString();
+  const newTask: Task = {
+    id: taskId,
+    name,
+    timeElapsed: 0,
+    isRunning: false
+  };
+  
+  userData.tasks.unshift(newTask);
+  fs.writeFileSync(filePath, JSON.stringify(userData, null, 2));
+  return taskId;
 };
 
-export const getUserByName = (name: string) => {
-  const db = getDb();
-  return db.selectObject('SELECT * FROM users WHERE name = ?', [name]);
+export const updateTaskTime = (userId: number, taskId: string, timeElapsed: number) => {
+  const filePath = getUserFilePath(userId);
+  const userData: UserData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  
+  userData.tasks = userData.tasks.map(task => 
+    task.id === taskId ? { ...task, timeElapsed } : task
+  );
+  
+  fs.writeFileSync(filePath, JSON.stringify(userData, null, 2));
 };
 
-export const getTasks = (userId: number) => {
-  const db = getDb();
-  return db.selectObjects('SELECT * FROM tasks WHERE user_id = ?', [userId]);
+export const deleteTask = (userId: number, taskId: string) => {
+  const filePath = getUserFilePath(userId);
+  const userData: UserData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  
+  userData.tasks = userData.tasks.filter(task => task.id !== taskId);
+  fs.writeFileSync(filePath, JSON.stringify(userData, null, 2));
 };
 
-export const createTask = (userId: number, name: string) => {
-  const db = getDb();
-  const stmt = db.prepare('INSERT INTO tasks (user_id, name) VALUES (?, ?)');
-  stmt.run([userId, name]);
-  return db.selectValue('SELECT last_insert_rowid()');
-};
-
-export const updateTaskTime = (taskId: number, timeElapsed: number) => {
-  const db = getDb();
-  const stmt = db.prepare('UPDATE tasks SET timeElapsed = ? WHERE id = ?');
-  stmt.run([timeElapsed, taskId]);
-};
-
-export const deleteTask = (taskId: number) => {
-  const db = getDb();
-  const stmt = db.prepare('DELETE FROM tasks WHERE id = ?');
-  stmt.run([taskId]);
-};
-
-export const updateTaskRunningState = (taskId: number, isRunning: boolean) => {
-  const db = getDb();
-  const stmt = db.prepare('UPDATE tasks SET isRunning = ? WHERE id = ?');
-  stmt.run([isRunning ? 1 : 0, taskId]);
+export const updateTaskRunningState = (userId: number, taskId: string, isRunning: boolean) => {
+  const filePath = getUserFilePath(userId);
+  const userData: UserData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  
+  userData.tasks = userData.tasks.map(task => 
+    task.id === taskId ? { ...task, isRunning } : task
+  );
+  
+  fs.writeFileSync(filePath, JSON.stringify(userData, null, 2));
 };

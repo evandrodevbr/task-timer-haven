@@ -13,7 +13,6 @@ interface Task {
   name: string;
   timeElapsed: number;
   isRunning: boolean;
-  startTime: number | null;
   isEditing: boolean;
 }
 
@@ -43,7 +42,7 @@ const TimeTracker = () => {
           if (task.isRunning && task.startTime) {
             const timeElapsed = task.timeElapsed + (Date.now() - task.startTime);
             if (currentUser) {
-              db.updateTaskTime(parseInt(task.id), timeElapsed);
+              db.updateTaskTime(currentUser.id, task.id, timeElapsed);
             }
             return { ...task, timeElapsed, startTime: Date.now() };
           }
@@ -59,10 +58,7 @@ const TimeTracker = () => {
     if (!currentUser) return;
     const dbTasks = await db.getTasks(currentUser.id);
     setTasks(dbTasks.map(task => ({
-      id: task.id.toString(),
-      name: task.name,
-      timeElapsed: task.timeElapsed,
-      isRunning: Boolean(task.isRunning),
+      ...task,
       startTime: null,
       isEditing: false
     })));
