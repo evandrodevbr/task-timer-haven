@@ -4,7 +4,11 @@ let db: any = null;
 
 export const initDatabase = async () => {
   try {
-    const sqlite3 = await SQLite();
+    const sqlite3 = await SQLite({
+      print: console.log,
+      printErr: console.error,
+    });
+    
     db = new sqlite3.oo1.DB();
     
     // Create tables
