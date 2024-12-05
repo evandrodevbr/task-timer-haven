@@ -4,21 +4,20 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { PlayCircle, PauseCircle, StopCircle, Plus } from "lucide-react";
+import { PlayCircle, PauseCircle, StopCircle, Plus, Trash2, Pencil } from "lucide-react";
 
 interface Task {
   id: string;
   name: string;
-  project: string;
   timeElapsed: number;
   isRunning: boolean;
   startTime: number | null;
+  isEditing: boolean;
 }
 
 const TimeTracker = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskName, setNewTaskName] = useState("");
-  const [newProject, setNewProject] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -47,11 +46,16 @@ const TimeTracker = () => {
       .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  const parseTime = (timeString: string): number => {
+    const [hours, minutes, seconds] = timeString.split(':').map(Number);
+    return ((hours * 60 * 60) + (minutes * 60) + seconds) * 1000;
+  };
+
   const addTask = () => {
-    if (!newTaskName.trim() || !newProject.trim()) {
+    if (!newTaskName.trim()) {
       toast({
         title: "Erro",
-        description: "Por favor, preencha todos os campos",
+        description: "Por favor, insira o nome da tarefa",
         variant: "destructive",
       });
       return;
@@ -60,15 +64,14 @@ const TimeTracker = () => {
     const newTask: Task = {
       id: Date.now().toString(),
       name: newTaskName,
-      project: newProject,
       timeElapsed: 0,
       isRunning: false,
       startTime: null,
+      isEditing: false,
     };
 
     setTasks(prev => [newTask, ...prev]);
     setNewTaskName("");
-    setNewProject("");
     
     toast({
       title: "Tarefa adicionada",
@@ -102,30 +105,50 @@ const TimeTracker = () => {
     );
   };
 
+  const deleteTask = (taskId: string) => {
+    setTasks(currentTasks => currentTasks.filter(task => task.id !== taskId));
+    toast({
+      title: "Tarefa excluída",
+      description: "A tarefa foi removida com sucesso",
+    });
+  };
+
+  const toggleEditMode = (taskId: string) => {
+    setTasks(currentTasks =>
+      currentTasks.map(task => {
+        if (task.id === taskId) {
+          return { ...task, isEditing: !task.isEditing };
+        }
+        return task;
+      })
+    );
+  };
+
+  const updateTaskTime = (taskId: string, timeString: string) => {
+    const newTime = parseTime(timeString);
+    setTasks(currentTasks =>
+      currentTasks.map(task => {
+        if (task.id === taskId) {
+          return { ...task, timeElapsed: newTime, isEditing: false };
+        }
+        return task;
+      })
+    );
+  };
+
   return (
     <div className="container mx-auto p-6 max-w-3xl animate-slide-up">
       <div className="space-y-6">
         <div className="glass-card rounded-lg p-6 space-y-4">
           <h2 className="text-2xl font-semibold tracking-tight">Novo Registro</h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="taskName">Nome da Tarefa</Label>
-              <Input
-                id="taskName"
-                placeholder="Digite o nome da tarefa"
-                value={newTaskName}
-                onChange={(e) => setNewTaskName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="project">Projeto</Label>
-              <Input
-                id="project"
-                placeholder="Nome do projeto"
-                value={newProject}
-                onChange={(e) => setNewProject(e.target.value)}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="taskName">Nome da Tarefa</Label>
+            <Input
+              id="taskName"
+              placeholder="Digite o nome da tarefa"
+              value={newTaskName}
+              onChange={(e) => setNewTaskName(e.target.value)}
+            />
           </div>
           <Button onClick={addTask} className="w-full">
             <Plus className="mr-2 h-4 w-4" /> Adicionar Tarefa
@@ -138,12 +161,28 @@ const TimeTracker = () => {
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <h3 className="font-medium">{task.name}</h3>
-                  <p className="text-sm text-muted-foreground">{task.project}</p>
                 </div>
                 <div className="flex items-center space-x-4">
-                  <span className="timer-text text-lg font-mono">
-                    {formatTime(task.timeElapsed)}
-                  </span>
+                  {task.isEditing ? (
+                    <Input
+                      type="text"
+                      defaultValue={formatTime(task.timeElapsed)}
+                      className="w-32 text-center font-mono"
+                      onBlur={(e) => updateTaskTime(task.id, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          updateTaskTime(task.id, e.currentTarget.value);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <span 
+                      className="timer-text text-lg font-mono cursor-pointer"
+                      onClick={() => toggleEditMode(task.id)}
+                    >
+                      {formatTime(task.timeElapsed)}
+                    </span>
+                  )}
                   <div className="flex space-x-2">
                     <Button
                       variant={task.isRunning ? "destructive" : "default"}
@@ -162,6 +201,13 @@ const TimeTracker = () => {
                       onClick={() => stopTask(task.id)}
                     >
                       <StopCircle className="h-5 w-5" />
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => deleteTask(task.id)}
+                    >
+                      <Trash2 className="h-5 w-5" />
                     </Button>
                   </div>
                 </div>
