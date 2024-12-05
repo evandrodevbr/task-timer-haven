@@ -1,6 +1,3 @@
-import fs from 'fs';
-import path from 'path';
-
 interface User {
   id: number;
   name: string;
@@ -18,42 +15,31 @@ interface UserData {
   tasks: Task[];
 }
 
-const DATABASE_DIR = path.join(process.cwd(), 'database');
-
-// Ensure database directory exists
-if (!fs.existsSync(DATABASE_DIR)) {
-  fs.mkdirSync(DATABASE_DIR, { recursive: true });
-}
-
-const getUserFilePath = (userId: number) => {
-  return path.join(DATABASE_DIR, `user_${userId}.json`);
-};
-
 let lastUserId = 0;
 
-// Load the last user ID from existing files
-const userFiles = fs.readdirSync(DATABASE_DIR);
-userFiles.forEach(file => {
-  if (file.startsWith('user_') && file.endsWith('.json')) {
-    const userId = parseInt(file.replace('user_', '').replace('.json', ''));
-    if (userId > lastUserId) {
-      lastUserId = userId;
-    }
+// Load the last user ID from localStorage
+const loadLastUserId = () => {
+  const storedLastUserId = localStorage.getItem('lastUserId');
+  if (storedLastUserId) {
+    lastUserId = parseInt(storedLastUserId);
   }
-});
+};
+
+const getUserKey = (userId: number) => `user_${userId}`;
 
 export const initDatabase = async () => {
-  // No initialization needed for JSON files
+  loadLastUserId();
   return Promise.resolve();
 };
 
 export const getUserByName = (name: string): User | null => {
-  const userFiles = fs.readdirSync(DATABASE_DIR);
-  for (const file of userFiles) {
-    if (file.endsWith('.json')) {
-      const userData = JSON.parse(fs.readFileSync(path.join(DATABASE_DIR, file), 'utf-8'));
-      if (userData.name === name) {
-        return { id: parseInt(file.split('_')[1].replace('.json', '')), name };
+  for (let i = 0; i <= lastUserId; i++) {
+    const userKey = getUserKey(i);
+    const userData = localStorage.getItem(userKey);
+    if (userData) {
+      const parsedData = JSON.parse(userData) as UserData;
+      if (parsedData.name === name) {
+        return { id: i, name };
       }
     }
   }
@@ -63,27 +49,30 @@ export const getUserByName = (name: string): User | null => {
 export const createUser = (name: string): number => {
   lastUserId++;
   const userId = lastUserId;
-  const userData = {
+  const userData: UserData = {
     name,
     tasks: []
   };
-  fs.writeFileSync(getUserFilePath(userId), JSON.stringify(userData, null, 2));
+  localStorage.setItem(getUserKey(userId), JSON.stringify(userData));
+  localStorage.setItem('lastUserId', userId.toString());
   return userId;
 };
 
 export const getTasks = (userId: number): Task[] => {
-  const filePath = getUserFilePath(userId);
-  if (!fs.existsSync(filePath)) {
+  const userKey = getUserKey(userId);
+  const userData = localStorage.getItem(userKey);
+  if (!userData) {
     return [];
   }
-  const userData: UserData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  return userData.tasks || [];
+  const parsedData = JSON.parse(userData) as UserData;
+  return parsedData.tasks || [];
 };
 
 export const createTask = (userId: number, name: string): string => {
-  const filePath = getUserFilePath(userId);
-  const userData: UserData = fs.existsSync(filePath) 
-    ? JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+  const userKey = getUserKey(userId);
+  const userData = localStorage.getItem(userKey);
+  const parsedData: UserData = userData 
+    ? JSON.parse(userData)
     : { name: '', tasks: [] };
   
   const taskId = Date.now().toString();
@@ -94,37 +83,43 @@ export const createTask = (userId: number, name: string): string => {
     isRunning: false
   };
   
-  userData.tasks.unshift(newTask);
-  fs.writeFileSync(filePath, JSON.stringify(userData, null, 2));
+  parsedData.tasks.unshift(newTask);
+  localStorage.setItem(userKey, JSON.stringify(parsedData));
   return taskId;
 };
 
 export const updateTaskTime = (userId: number, taskId: string, timeElapsed: number) => {
-  const filePath = getUserFilePath(userId);
-  const userData: UserData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  const userKey = getUserKey(userId);
+  const userData = localStorage.getItem(userKey);
+  if (!userData) return;
   
-  userData.tasks = userData.tasks.map(task => 
+  const parsedData = JSON.parse(userData) as UserData;
+  parsedData.tasks = parsedData.tasks.map(task => 
     task.id === taskId ? { ...task, timeElapsed } : task
   );
   
-  fs.writeFileSync(filePath, JSON.stringify(userData, null, 2));
+  localStorage.setItem(userKey, JSON.stringify(parsedData));
 };
 
 export const deleteTask = (userId: number, taskId: string) => {
-  const filePath = getUserFilePath(userId);
-  const userData: UserData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  const userKey = getUserKey(userId);
+  const userData = localStorage.getItem(userKey);
+  if (!userData) return;
   
-  userData.tasks = userData.tasks.filter(task => task.id !== taskId);
-  fs.writeFileSync(filePath, JSON.stringify(userData, null, 2));
+  const parsedData = JSON.parse(userData) as UserData;
+  parsedData.tasks = parsedData.tasks.filter(task => task.id !== taskId);
+  localStorage.setItem(userKey, JSON.stringify(parsedData));
 };
 
 export const updateTaskRunningState = (userId: number, taskId: string, isRunning: boolean) => {
-  const filePath = getUserFilePath(userId);
-  const userData: UserData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  const userKey = getUserKey(userId);
+  const userData = localStorage.getItem(userKey);
+  if (!userData) return;
   
-  userData.tasks = userData.tasks.map(task => 
+  const parsedData = JSON.parse(userData) as UserData;
+  parsedData.tasks = parsedData.tasks.map(task => 
     task.id === taskId ? { ...task, isRunning } : task
   );
   
-  fs.writeFileSync(filePath, JSON.stringify(userData, null, 2));
+  localStorage.setItem(userKey, JSON.stringify(parsedData));
 };
