@@ -1,69 +1,66 @@
-# Welcome to your Lovable project
 
-## Project info
+# bythetime - Task Timer
 
-**URL**: https://lovable.dev/projects/b8f66a75-1473-4fbb-9a3e-ce5cbab94ac1
+A sophisticated task timer application designed to enhance productivity and time management.
 
-## How can I edit this code?
+## 🚀 Overview
 
-There are several ways of editing your application.
+Task Timer Haven is a modern web application that helps users track their time effectively with an intuitive interface and powerful features.
 
-**Use Lovable**
+## ✨ Features
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/b8f66a75-1473-4fbb-9a3e-ce5cbab94ac1) and start prompting.
+- 📊 Task time tracking
+- 🎯 Project management
+- ⏱️ Multiple timer support 
+- 📈 Progress analytics
+- 💾 Data persistence
+- 🌙 Dark/Light mode
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🛠️ Technologies
 
-**Use your preferred IDE**
+- **Frontend Framework:** React
+- **Build Tool:** Vite
+- **Language:** TypeScript
+- **UI Components:** shadcn-ui
+- **Styling:** Tailwind CSS
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 🔧 Installation
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+```bash
+# Clone the repository
+git clone https://github.com/evandrodevbr/task-timer-haven.git
 
-Follow these steps:
+# Navigate to project directory
+cd task-timer-haven
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Install dependencies
+npm install
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## 💻 Usage
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+1. Start the application
+2. Create new tasks
+3. Track time for each task
+4. Monitor progress
+5. View analytics
 
-**Use GitHub Codespaces**
+## 🤝 Contributing
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-## What technologies are used for this project?
+## 📝 License
 
-This project is built with .
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 👤 Author
 
-## How can I deploy this project?
+Evandro Developer
+- GitHub: [@evandrodevbr](https://github.com/evandrodevbr)
 
-Simply open [Lovable](https://lovable.dev/projects/b8f66a75-1473-4fbb-9a3e-ce5cbab94ac1) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+---
+Made with ❤️ and ☕
+```
